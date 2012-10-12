@@ -17,27 +17,27 @@ class FacebookApp {
 
 	public function api(/* polymorphic */)
 	{
-    $args = func_get_args();
-    $fb = $this->fb;
-    $name = is_array($args[0]) ? $args[0]['method'] : $args[0];
-    $ret = null;
+		$args = func_get_args();
+		$fb = $this->fb;
+		$name = is_array($args[0]) ? $args[0]['method'] : $args[0];
+		$ret = null;
 
-    try
-    {
-	    Profiler::time(function() use ($args, $fb, &$ret) {
-	    	$ret = call_user_func_array(array($fb, 'api'), $args);
-	    }, "API call $name");
-	  }
-	  catch (\FacebookApiException $e)
-	  {
-	  	$code = $e->getData()['code'];
+		try
+		{
+			Profiler::time(function() use ($args, $fb, &$ret) {
+				$ret = call_user_func_array(array($fb, 'api'), $args);
+			}, "API call $name");
+		}
+		catch (\FacebookApiException $e)
+		{
+			$code = $e->getData()['code'];
 			if (in_array($code, array(190)))
 				Event::fire('facebook.auth_required');
 
 			throw $e;
-	  }
+		}
 
-    return $ret;
+		return $ret;
 	}
 
 	public function auth()
