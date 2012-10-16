@@ -4,11 +4,8 @@ class ActionBirthday extends Action {
 
 	protected function _check()
 	{
-		$bday = $this->user->fb_api('')['birthday'];
-		$ret = date('d-m', strtotime($bday)) === date('d-m');
-
-		echo 'Checked action, ' . $ret;
-		return $ret;
+		$bday = User::me()->info()['birthday'];
+		return date('d-m', strtotime($bday)) === date('d-m');
 	}
 
 	protected function _initialize()

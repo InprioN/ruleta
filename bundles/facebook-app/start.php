@@ -7,29 +7,37 @@
  * @version 1.0 - 2012-10-11
  */
 
-Autoloader::map(array(
+Autoloader::map([
 	'Facebook' => Bundle::path('facebook-app').'facebook-sdk/facebook.php',
 	'FacebookApp' => Bundle::path('facebook-app').'facebookapp.php',
-));
+]);
 
 Laravel\IoC::singleton('facebook-app', function()
 {
-	$config = array();
+	$config = [];
 	$config['appId'] = Config::get('facebook.app_id');
 	$config['secret'] = Config::get('facebook.secret');
+	$config['namespace'] = Config::get('facebook.namespace');
 	$config['scope'] = Config::get('facebook.scope', []);
 	$config['fileUpload'] = Config::get('facebook.file_upload', true);
 
 	return new FacebookApp($config);
 });
 
-Event::listen('facebook.auth_required', function()
+Event::listen('facebook.auth_required', function($reason)
 {
 	Session::forget('facebook.user');
+
+	Log::debug('FBAuth - ' . $reason);
 
 	$fbapp = IoC::resolve('facebook-app');
 	$content = '<script>window.top.location = "' . $fbapp->authURL() . '";</script>';
 
 	echo Response::prepare($content)->render();
 	exit(1);
+});
+
+Route::filter('before', function()
+{
+	IoC::resolve('facebook-app');
 });

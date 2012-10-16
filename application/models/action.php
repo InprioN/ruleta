@@ -5,9 +5,18 @@ class Action extends Eloquent {
 	public static $table = 'actions';
 	public static $timestamps = false;
 
-	private static $types = array(
+	private static $types = [
+		// 1 => 'Picture',
+		2 => 'Relationship',
+		// 3 => 'Publishing',
 		4 => 'Birthday',
-	);
+		5 => 'Checkin',
+		6 => 'Workplace',
+		7 => 'Like',
+		8 => 'Friends',
+		9 => 'Hashtag',
+		10 => 'Hometown',
+	];
 
 	public static function create_for_user(User $user, $type)
 	{
@@ -16,10 +25,10 @@ class Action extends Eloquent {
 
 		$class = self::subclass($type);
 
-		$action = new $class(array(
+		$action = new $class([
 			'user_id' => $user->id,
 			'type' => $type,
-		));
+		]);
 
 		$action->_initialize();
 
@@ -32,12 +41,12 @@ class Action extends Eloquent {
 	public static function subclass($type)
 	{
 		if (!array_key_exists($type, self::$types))
-			throw new Exception('Unknown action type: ' . $type);
+			throw new \Exception('Unknown action type: ' . $type);
 
 		$class = 'Action' . self::$types[$type];
 
 		if (!class_exists($class))
-			throw new Exception('Could not find Action subclass: ' . $class);
+			throw new \Exception('Could not find Action subclass: ' . $class);
 
 		return $class;
 	}
@@ -50,10 +59,13 @@ class Action extends Eloquent {
 	public function check()
 	{
 		if (!is_a($this, 'Action'))
-			throw new Exception('You can only call check() on the parent model Action');
+			throw new \Exception('You can only call check() on the parent model Action');
 
-		if (!$this->user->is_me())
-			throw new Exception('A user can only check its own actions');
+		if ($this->user_id != User::me()->id)
+			throw new \Exception('A user can only check its own actions');
+
+		if ($this->completed)
+			return $this->completed;
 
 		$completed = $this->subclass_me()->_check();
 
@@ -68,6 +80,9 @@ class Action extends Eloquent {
 
 	public function subclass_me()
 	{
+		if (get_parent_class($this) == 'Action')
+			return $this;
+
 		$class = self::subclass($this->type);
 		return $class::find($this->id);
 	}
@@ -77,9 +92,9 @@ class Action extends Eloquent {
 		return $this->belongs_to('User');
 	}
 
-	protected function getData($data)
+	protected function getData()
 	{
-		return unserialize($data);
+		return unserialize($this->data);
 	}
 
 	protected function setData($data)

@@ -1,65 +1,72 @@
 <?php
 
-/*
-|--------------------------------------------------------------------------
-| Application Routes
-|--------------------------------------------------------------------------
-|
-| Simply tell Laravel the HTTP verbs and URIs it should respond to. It is a
-| breeze to setup your application using Laravel's RESTful routing and it
-| is perfectly suited for building large applications and simple APIs.
-|
-| Let's respond to a simple GET request to http://example.com/hello:
-|
-|		Route::get('hello', function()
-|		{
-|			return 'Hello World!';
-|		});
-|
-| You can even respond to more than one URI:
-|
-|		Route::post(array('hello', 'world'), function()
-|		{
-|			return 'Hello World!';
-|		});
-|
-| It's easy to allow URI wildcards using (:num) or (:any):
-|
-|		Route::put('hello/(:any)', function($name)
-|		{
-|			return "Welcome, $name.";
-|		});
-|
-*/
-
 Route::any('', function()
 {
-	try
-	{
-		$action = User::me()->spin()->check();
-	}
-	catch (\Exception $e)
-	{
-		echo $e->getMessage();
-	}
-
-	return '';
+	return Redirect::to_route('profile');
 });
 
-/*
-|--------------------------------------------------------------------------
-| Application 404 & 500 Error Handlers
-|--------------------------------------------------------------------------
-|
-| To centralize and simplify 404 handling, Laravel uses an awesome event
-| system to retrieve the response. Feel free to modify this function to
-| your tastes and the needs of your application.
-|
-| Similarly, we use an event to handle the display of 500 level errors
-| within the application. These errors are fired when there is an
-| uncaught exception thrown in the application.
-|
-*/
+Route::get('picture/(:num)', ['as' => 'picture', function($id)
+{
+	$filename = 'pictures/' . $id . '.jpg';
+	$path = path('public') . $filename;
+
+	if (File::exists($path))
+		return Redirect::to(asset($filename));
+
+	$fbapp = IoC::resolve('facebook-app');
+	$call = "$id/picture?type=large";
+	$url = 'https://graph.facebook.com/' . $call;
+	$picture = $fbapp->api($call . '&redirect=false');
+
+	if (!isset($picture['data']) || $picture['data']['is_silhouette'])
+		return Redirect::to($url);
+
+	$image = imagecreatefromjpeg($picture['data']['url']);
+
+	if (!$image)
+		return Redirect::to($url);
+
+	if (!imagefilter($image, IMG_FILTER_GRAYSCALE))
+		return Redirect::to($url);
+
+	imagejpeg($image, $path, 75);
+	return Redirect::to(asset($filename));
+}]);
+
+Route::group(['before' => 'auth'], function()
+{
+
+	Route::any('profile', ['as' => 'profile', function()
+	{
+		return View::make('profile', [
+			'user' => User::me(),
+		]);
+	}]);
+
+	Route::get('check/(:num)', ['as' => 'check', function($id)
+	{
+		try {
+			$action = Action::find($id);
+			if (!$action)
+				throw new \Exception('Action not found');
+			
+			return Response::json(['done' => $action->check()]);
+		} catch (\Exception $e) {
+			return Response::json(['error' => $e->getMessage()]);
+		}
+	}]);
+
+	Route::get('spin', ['as' => 'spin', function()
+	{
+		try {
+			return Response::eloquent(User::me()->spin());
+		} catch (\Exception $e) {
+			return Response::json(['error' => $e->getMessage()]);
+		}
+	}]);
+
+});
+
 
 Event::listen('404', function()
 {
@@ -71,35 +78,8 @@ Event::listen('500', function()
 	return Response::error('500');
 });
 
-/*
-|--------------------------------------------------------------------------
-| Route Filters
-|--------------------------------------------------------------------------
-|
-| Filters provide a convenient method for attaching functionality to your
-| routes. The built-in before and after filters are called before and
-| after every request to your application, and you may even create
-| other filters that can be attached to individual routes.
-|
-| Let's walk through an example...
-|
-| First, define a filter:
-|
-|		Route::filter('filter', function()
-|		{
-|			return 'Filtered!';
-|		});
-|
-| Next, attach the filter to a route:
-|
-|		Router::register('GET /', array('before' => 'filter', function()
-|		{
-|			return 'Hello World!';
-|		}));
-|
-*/
 
-Route::filter('before', function()
+Route::filter('auth', function()
 {
 	$fbapp = IoC::resolve('facebook-app');
 	$fbapp->auth();
@@ -107,17 +87,7 @@ Route::filter('before', function()
 	$user = User::ensure($fbapp->me());
 });
 
-Route::filter('after', function($response)
-{
-	// Do stuff after every request to your application...
-});
-
 Route::filter('csrf', function()
 {
 	if (Request::forged()) return Response::error('500');
-});
-
-Route::filter('auth', function()
-{
-	if (Auth::guest()) return Redirect::to('login');
 });
