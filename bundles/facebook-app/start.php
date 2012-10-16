@@ -33,8 +33,11 @@ Event::listen('facebook.auth_required', function($reason)
 	$fbapp = IoC::resolve('facebook-app');
 	$content = '<script>window.top.location = "' . $fbapp->authURL() . '";</script>';
 
-	echo Response::prepare($content)->render();
-	exit(1);
+	while (ob_get_level() > 0)
+		ob_end_clean();
+
+	echo Response::make($content)->render();
+	exit();
 });
 
 Route::filter('before', function()
